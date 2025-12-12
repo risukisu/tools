@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decision Canvas</title>
+    <style>
+        /* --- 1. RESET & VARIABLES --- */
+        :root {
+            --bg-body: #FFFFFF;
+            --bg-subtle: #F9FAFB;
+            --bg-element: #FFFFFF;
+            --text-main: #111827;
+            --text-secondary: #6B7280;
+            --border-color: #E5E7EB;
+            --focus-ring: #111827;
+            --accent-color: #2563EB;
+            --radius: 6px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --col-backlog: #F3F4F6;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* App-like feel */
+        }
+
+        /* --- 2. TYPOGRAPHY --- */
+        h1, h2, h3 { letter-spacing: -0.025em; margin: 0; font-weight: 600; }
+        p { color: var(--text-secondary); line-height: 1.5; margin: 0; }
+        
+        /* --- 3. UI COMPONENTS --- */
+        button {
+            background: var(--bg-element);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        button:hover { background-color: var(--bg-subtle); border-color: #D1D5DB; }
+        button:active { background-color: #F3F4F6; transform: translateY(0px); }
+        button.primary { background: var(--text-main); color: white; border: 1px solid var(--text-main); }
+        button.primary:hover { background: #000; opacity: 0.9; }
+        
+        input, textarea {
+            width: 100%;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.15s;
+        }
+        input:focus, textarea:focus { border-color: var(--focus-ring); }
+
+        /* --- 4. LAYOUT & VIEWS --- */
+        header {
+            height: 60px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: var(--bg-body);
+            z-index: 10;
+        }
+
+        main {
+            flex: 1;
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--bg-subtle);
+        }
+
+        .view-container {
+            display: none;
+            height: 100%;
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .view-container.active { display: flex; flex-direction: column; }
+
+        /* --- VIEW: INPUT --- */
+        #view-input textarea {
+            flex: 1;
+            resize: none;
+            font-size: 16px;
+            line-height: 1.6;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+        .input-controls {
+            margin-top: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* --- VIEW: FOCUS (REVIEW) --- */
+        #view-focus { align-items: center; justify-content: center; position: relative; }
+        
+        .progress-bar-container {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: #E5E7EB;
+        }
+        .progress-bar { height: 100%; background: var(--text-main); transition: width 0.3s ease; }
+
+        .focus-card {
+            background: white;
+            width: 100%;
+            max-width: 600px;
+            min-height: 300px;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            margin-bottom: 32px;
+            position: relative;
+        }
+        .focus-card h2 { font-size: 24px; font-weight: 500; color: var(--text-main); margin-bottom: 8px; }
+        .focus-card .meta { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 24px;}
+
+        .decision-dock {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .decision-btn {
+            min-width: 100px;
+            display: flex;
+            flex-direction: column;
+            padding: 12px 20px;
+            gap: 4px;
+            height: auto;
+        }
+        .decision-btn kbd {
+            font-size: 10px;
+            opacity: 0.6;
+            font-family: monospace;
+            background: rgba(0,0,0,0.05);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .nav-dock {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* --- VIEW: SUMMARY (KANBAN) --- */
+        #view-summary { 
+            display: none; /* Override flex default for grid */
+            padding: 24px;
+            height: 100%;
+            overflow-x: auto;
+        }
+        #view-summary.active { display: grid; }
+        
+        .kanban-board {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: 300px; /* Fixed width columns */
+            gap: 16px;
+            height: 100%;
+        }
+
+        .kanban-column {
+            background: var(--bg-subtle);
+            border-right: 1px solid var(--border-color); /* Separator look */
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-width: 280px;
+        }
+        /* Make backlog distinctive */
+        .kanban-column[data-id="backlog"] { background: #f3f4f640; border: 1px dashed var(--border-color); }
+
+        .column-header {
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0,0,0,0.03);
+            position: sticky;
+            top: 0;
+            background: inherit;
+            border-radius: 8px 8px 0 0;
+            z-index: 2;
+        }
+        .count-badge {
+            background: rgba(0,0,0,0.05);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .column-body {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .kanban-item {
+            background: white;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            cursor: grab;
+            transition: box-shadow 0.2s, transform 0.1s;
+        }
+        .kanban-item:hover { box-shadow: var(--shadow-sm); border-color: #d1d5db; }
+        .kanban-item:active { cursor: grabbing; }
+        .kanban-item.dragging { opacity: 0.5; transform: scale(0.98); }
+
+        /* --- MODAL (SETTINGS) --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        
+        .modal {
+            background: white;
+            width: 100%; max-width: 500px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            padding: 24px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        
+        .settings-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+        }
+        .color-picker { width: 32px; height: 32px; padding: 0; border: none; background: none; cursor: pointer; }
+        .settings-input { border: none; flex: 1; font-weight: 500; }
+        .settings-key { width: 60px; text-align: center; text-transform: uppercase; font-family: monospace; }
+        
+        .danger-zone {
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* --- UTILS --- */
+        .hidden { display: none !important; }
+        .text-sm { font-size: 12px; }
+        .flex-spacer { flex: 1; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+            <h3>Triage</h3>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button id="btn-summary" onclick="router.navigate('summary')">Summary</button>
+            <button id="btn-input" onclick="router.navigate('input')">Edit List</button>
+            <button onclick="settingsModal.open()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        
+        <div id="view-input" class="view-container">
+            <h2>Paste your list</h2>
+            <p style="margin-bottom: 16px;">One item per line. Bullets and numbers will be automatically cleaned.</p>
+            <textarea id="raw-input" placeholder="1. Buy milk&#10;2. Call John&#10;- Schedule meeting"></textarea>
+            <div class="input-controls">
+                <button onclick="app.clearList()" style="color: #EF4444; border-color: #FECACA;">Clear</button>
+                <button class="primary" onclick="app.processInput()">Start Review &rarr;</button>
+            </div>
+        </div>
+
+        <div id="view-focus" class="view-container">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+            </div>
+
+            <div class="focus-card">
+                <div class="meta">Item <span id="current-index">1</span> of <span id="total-count">10</span></div>
+                <h2 id="focus-text">Loading...</h2>
+                <div id="focus-status" class="meta" style="margin-top: 12px; color: var(--accent-color);"></div>
+            </div>
+
+            <div class="decision-dock" id="decision-buttons">
+                </div>
+
+            <div class="nav-dock">
+                <span>&larr; Prev</span>
+                <span style="margin: 0 12px; opacity: 0.3">|</span>
+                <span>Next &rarr;</span>
+            </div>
+        </div>
+
+        <div id="view-summary" class="view-container">
+            <div class="kanban-board" id="kanban-board">
+                </div>
+        </div>
+
+    </main>
+
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
+                <h2>Settings</h2>
+                <button onclick="settingsModal.close()">Close</button>
+            </div>
+
+            <h3>Categories</h3>
+            <p class="text-sm" style="margin-bottom: 12px;">Name, Color, Shortcut (Alt + Key)</p>
+            <div id="settings-categories-list"></div>
+            <button onclick="app.addCategory()" style="width: 100%; margin-top: 8px;">+ Add Category</button>
+
+            <div class="danger-zone">
+                <h3>Data</h3>
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
+                    <button onclick="app.exportData('copy')">Copy to Clipboard</button>
+                    <button onclick="app.exportData('csv')">Download CSV</button>
+                </div>
+                <div style="margin-top: 12px;">
+                    <button onclick="app.resetAll()" style="color: #EF4444; border-color: #FECACA; width: 100%;">Factory Reset App</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & STATE ---
+        const DEFAULT_CATEGORIES = [
+            { id: 'cat_yes', name: 'Yes', color: '#10B981', key: 'y' },
+            { id: 'cat_maybe', name: 'Maybe', color: '#F59E0B', key: 'm' },
+            { id: 'cat_no', name: 'No', color: '#EF4444', key: 'n' }
+        ];
+
+        const state = {
+            items: [],      // { id, text, categoryId (null=backlog) }
+            categories: [], 
+            focusIndex: 0,
+            view: 'input'
+        };
+
+        // --- PERSISTENCE ---
+        const DB_KEY = 'triage_app_v1';
+        
+        function saveState() {
+            localStorage.setItem(DB_KEY, JSON.stringify(state));
+        }
+
+        function loadState() {
+            const raw = localStorage.getItem(DB_KEY);
+            if (raw) {
+                const loaded = JSON.parse(raw);
+                state.items = loaded.items || [];
+                state.categories = loaded.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+                state.focusIndex = loaded.focusIndex || 0;
+                // Don't restore view state, start fresh or based on data
+                state.view = state.items.length > 0 ? 'summary' : 'input';
+            } else {
+                state.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+            }
+        }
+
+        // --- CORE APP LOGIC ---
+        const app = {
+            init: () => {
+                loadState();
+                router.navigate(state.view);
+                render.settings();
+                
+                // If we have items but are in input, fill the textarea
+                if (state.items.length > 0 && state.view === 'input') {
+                    const text = state.items.map(i => i.text).join('\n');
+                    document.getElementById('raw-input').value = text;
+                }
+            },
+
+            processInput: () => {
+                const raw = document.getElementById('raw-input').value;
+                if (!raw.trim()) return;
+
+                const lines = raw.split('\n');
+                
+                // Smart clean: remove bullets, numbering, whitespace
+                // Regex looks for: start of line, optional whitespace, optional (number+dot OR dash/bullet/star), optional whitespace
+                const cleanRegex = /^\s*(\d+\.|-|•|\*|\[\s?\])?\s*/;
+
+                const newItems = lines
+                    .map(line => line.replace(cleanRegex, '').trim())
+                    .filter(line => line.length > 0)
+                    .map(text => ({
+                        id: Date.now() + Math.random().toString(36).substr(2, 9),
+                        text: text,
+                        categoryId: null // Backlog
+                    }));
+
+                // If existing items exist, ask to merge or replace? For simplicity: Replace if in input view.
+                // But let's check if we are just "updating"
+                state.items = newItems;
+                state.focusIndex = 0;
+                saveState();
+                router.navigate('focus');
+            },
+
+            makeDecision: (categoryId) => {
+                const item = state.items[state.focusIndex];
+                if (!item) return;
+
+                item.categoryId = categoryId;
+                saveState();
+                
+                // Auto advance
+                if (state.focusIndex < state.items.length - 1) {
+                    state.focusIndex++;
+                    saveState();
+                    render.focus();
+                } else {
+                    // End of list
+                    render.focus(); // Update UI to show selection
+                    // Optional: Auto redirect to summary? 
+                    // Let's stay on focus view but show "Done" state? 
+                    // For now, just stay on last card.
+                }
+            },
+
+            prevItem: () => {
+                if (state.focusIndex > 0) {
+                    state.focusIndex--;
+                    saveState();
+                    render.focus();
+                }
+            },
+
+            nextItem: () => {
+                if (state.focusIndex < state.items.length - 1) {
+                    state.focusIndex++;
+                    saveState();
+                    render.focus();
+                }
+            },
+
+            clearList: () => {
+                if(confirm('Clear current list?')) {
+                    document.getElementById('raw-input').value = '';
+                    state.items = [];
+                    state.focusIndex = 0;
+                    saveState();
+                }
+            },
+
+            updateCategory: (index, field, value) => {
+                state.categories[index][field] = value;
+                saveState();
+                render.settings(); // Re-render settings list
+                render.focus(); // Re-render buttons
+            },
+
+            deleteCategory: (index) => {
+                if(state.categories.length <= 1) {
+                    alert('You need at least one category.');
+                    return;
+                }
+                const catId = state.categories[index].id;
+                
+                // Reset items with this category to backlog
+                state.items.forEach(i => {
+                    if(i.categoryId === catId) i.categoryId = null;
+                });
+
+                state.categories.splice(index, 1);
+                saveState();
+                render.settings();
+            },
+
+            addCategory: () => {
+                state.categories.push({
+                    id: 'cat_' + Date.now(),
+                    name: 'New',
+                    color: '#9CA3AF',
+                    key: ''
+                });
+                saveState();
+                render.settings();
+            },
+
+            moveItem: (itemId, newCatId) => {
+                const item = state.items.find(i => i.id === itemId);
+                if (item) {
+                    // 'backlog' string from dataset needs to be converted to null
+                    item.categoryId = newCatId === 'backlog' ? null : newCatId;
+                    saveState();
+                    render.summary(); // Re-render to update counts/positions
+                }
+            },
+
+            exportData: (type) => {
+                let content = '';
+                
+                if (type === 'copy') {
+                    state.categories.forEach(cat => {
+                        const items = state.items.filter(i => i.categoryId === cat.id);
+                        if(items.length) {
+                            content += `\n### ${cat.name}\n`;
+                            items.forEach(i => content += `- ${i.text}\n`);
+                        }
+                    });
+                    const backlog = state.items.filter(i => i.categoryId === null);
+                    if(backlog.length) {
+                        content += `\n### Backlog\n`;
+                        backlog.forEach(i => content += `- ${i.text}\n`);
+                    }
+                    navigator.clipboard.writeText(content.trim()).then(() => alert('Copied to clipboard!'));
+                } 
+                else if (type === 'csv') {
+                    content = "Decision,Item\n";
+                    state.items.forEach(i => {
+                        const cat = state.categories.find(c => c.id === i.categoryId);
+                        const decision = cat ? cat.name : 'Backlog';
+                        content += `"${decision}","${i.text.replace(/"/g, '""')}"\n`;
+                    });
+                    
+                    const blob = new Blob([content], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'triage-export.csv';
+                    a.click();
+                }
+            },
+
+            resetAll: () => {
+                if(confirm('Are you sure? This will delete everything.')) {
+                    localStorage.removeItem(DB_KEY);
+                    location.reload();
+                }
+            }
+        };
+
+        // --- ROUTER ---
+        const router = {
+            navigate: (viewName) => {
+                // Hide all
+                document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+                
+                // Show target
+                const target = document.getElementById('view-' + viewName);
+                if (target) {
+                    target.classList.add('active');
+                    state.view = viewName;
+                    saveState();
+                    
+                    // Trigger renders
+                    if (viewName === 'focus') render.focus();
+                    if (viewName === 'summary') render.summary();
+                }
+            }
+        };
+
+        // --- RENDERERS ---
+        const render = {
+            focus: () => {
+                const total = state.items.length;
+                if (total === 0) {
+                    document.getElementById('focus-text').innerText = "List is empty. Go to Edit List.";
+                    document.getElementById('decision-buttons').innerHTML = '';
+                    return;
+                }
+
+                const item = state.items[state.focusIndex];
+                document.getElementById('current-index').innerText = state.focusIndex + 1;
+                document.getElementById('total-count').innerText = total;
+                document.getElementById('focus-text').innerText = item.text;
+                
+                // Status indicator
+                const currentCat = state.categories.find(c => c.id === item.categoryId);
+                const statusEl = document.getElementById('focus-status');
+                if (currentCat) {
+                    statusEl.innerText = `Current: ${currentCat.name}`;
+                    statusEl.style.color = currentCat.color;
+                } else {
+                    statusEl.innerText = 'Uncategorized';
+                    statusEl.style.color = '#9CA3AF';
+                }
+
+                // Progress
+                const pct = ((state.focusIndex + 1) / total) * 100;
+                document.getElementById('progress-bar').style.width = `${pct}%`;
+
+                // Buttons
+                const btnContainer = document.getElementById('decision-buttons');
+                btnContainer.innerHTML = '';
+                
+                state.categories.forEach(cat => {
+                    const btn = document.createElement('button');
+                    btn.className = 'decision-btn';
+                    btn.style.borderBottom = `3px solid ${cat.color}`;
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.innerText = cat.name;
+                    
+                    const keyKbd = document.createElement('kbd');
+                    keyKbd.innerText = `Alt + ${cat.key.toUpperCase()}`;
+                    if (!cat.key) keyKbd.style.display = 'none';
+
+                    btn.appendChild(nameSpan);
+                    btn.appendChild(keyKbd);
+                    
+                    btn.onclick = () => app.makeDecision(cat.id);
+                    btnContainer.appendChild(btn);
+                });
+            },
+
+            summary: () => {
+                const board = document.getElementById('kanban-board');
+                board.innerHTML = '';
+
+                // 1. Backlog Column
+                render.column(board, { id: 'backlog', name: 'Backlog', color: '#6B7280' }, true);
+
+                // 2. Category Columns
+                state.categories.forEach(cat => {
+                    render.column(board, cat, false);
+                });
+            },
+
+            column: (parent, category, isBacklog) => {
+                const col = document.createElement('div');
+                col.className = 'kanban-column';
+                col.dataset.id = category.id; // For drag drop logic
+
+                // Filter items
+                const items = state.items.filter(i => 
+                    isBacklog ? i.categoryId === null : i.categoryId === category.id
+                );
+
+                const header = document.createElement('div');
+                header.className = 'column-header';
+                header.style.color = isBacklog ? '#374151' : category.color;
+                header.innerHTML = `
+                    <span>${category.name}</span>
+                    <span class="count-badge">${items.length}</span>
+                `;
+
+                const body = document.createElement('div');
+                body.className = 'column-body';
+                
+                // Drag Drop Events for Column (Drop Zone)
+                body.ondragover = (e) => { e.preventDefault(); body.style.background = '#F3F4F6'; };
+                body.ondragleave = () => { body.style.background = ''; };
+                body.ondrop = (e) => {
+                    e.preventDefault();
+                    body.style.background = '';
+                    const itemId = e.dataTransfer.getData('text/plain');
+                    app.moveItem(itemId, category.id);
+                };
+
+                items.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'kanban-item';
+                    card.innerText = item.text;
+                    card.draggable = true;
+                    
+                    card.ondragstart = (e) => {
+                        e.dataTransfer.setData('text/plain', item.id);
+                        card.classList.add('dragging');
+                    };
+                    card.ondragend = () => card.classList.remove('dragging');
+                    
+                    // Click to cycle decision (optional feature, maybe just focus?)
+                    // For now, let's keep it read/drag only to avoid complexity, 
+                    // or click to "Edit" in focus view could be added later.
+                    
+                    body.appendChild(card);
+                });
+
+                col.appendChild(header);
+                col.appendChild(body);
+                parent.appendChild(col);
+            },
+
+            settings: () => {
+                const list = document.getElementById('settings-categories-list');
+                list.innerHTML = '';
+
+                state.categories.forEach((cat, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'settings-row';
+                    
+                    // Color Input
+                    const colorInp = document.createElement('input');
+                    colorInp.type = 'color';
+                    colorInp.className = 'color-picker';
+                    colorInp.value = cat.color;
+                    colorInp.onchange = (e) => app.updateCategory(index, 'color', e.target.value);
+
+                    // Name Input
+                    const nameInp = document.createElement('input');
+                    nameInp.type = 'text';
+                    nameInp.className = 'settings-input';
+                    nameInp.value = cat.name;
+                    nameInp.onchange = (e) => app.updateCategory(index, 'name', e.target.value);
+
+                    // Key Input
+                    const keyInp = document.createElement('input');
+                    keyInp.type = 'text';
+                    keyInp.className = 'settings-input settings-key';
+                    keyInp.maxLength = 1;
+                    keyInp.placeholder = 'Key';
+                    keyInp.value = cat.key;
+                    keyInp.onchange = (e) => app.updateCategory(index, 'key', e.target.value.toLowerCase());
+
+                    // Delete Btn
+                    const delBtn = document.createElement('button');
+                    delBtn.innerHTML = '&times;';
+                    delBtn.style.padding = '4px 8px';
+                    delBtn.style.color = '#EF4444';
+                    delBtn.style.border = 'none';
+                    delBtn.onclick = () => app.deleteCategory(index);
+
+                    row.appendChild(colorInp);
+                    row.appendChild(nameInp);
+                    row.appendChild(keyInp);
+                    row.appendChild(delBtn);
+                    list.appendChild(row);
+                });
+            }
+        };
+
+        // --- KEYBOARD SHORTCUTS ---
+        document.addEventListener('keydown', (e) => {
+            // Only active in Focus View and not when typing in modal/input
+            if (state.view !== 'focus') return;
+            if (document.querySelector('.modal-overlay.open')) return;
+
+            // Navigation
+            if (e.key === 'ArrowRight') app.nextItem();
+            if (e.key === 'ArrowLeft') app.prevItem();
+
+            // Decisions (Alt + Key)
+            if (e.altKey) {
+                const char = e.key.toLowerCase();
+                const cat = state.categories.find(c => c.key === char);
+                if (cat) {
+                    e.preventDefault(); // Prevent browser defaults
+                    app.makeDecision(cat.id);
+                }
+            }
+        });
+
+        // --- UI HELPERS ---
+        const settingsModal = {
+            open: () => {
+                document.getElementById('settings-modal').classList.add('open');
+                render.settings();
+            },
+            close: () => {
+                document.getElementById('settings-modal').classList.remove('open');
+            }
+        };
+
+        // --- BOOT ---
+        app.init();
+
+    </script>
+</body>
+</html>t 
