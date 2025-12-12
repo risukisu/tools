@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firestore Recovery Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Font Setup */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background-color: #F9FAFB;
+            color: #111827;
+        }
+
+        .tracking-tight-custom {
+            letter-spacing: -0.025em;
+        }
+
+        .transition-subtle {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Inputs */
+        input,
+        textarea,
+        select {
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: #374151;
+            box-shadow: 0 0 0 1px #374151;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: #111827;
+            color: white;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background-color: white;
+            border: 1px solid #E5E7EB;
+            color: #374151;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .btn-secondary:hover {
+            border-color: #D1D5DB;
+            background-color: #F9FAFB;
+        }
+
+        /* JSON Tree Styles */
+        .json-tree {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .tree-row {
+            display: flex;
+            align-items: flex-start;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        .tree-row:hover {
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+
+        .tree-arrow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 18px;
+            margin-right: 2px;
+            color: #9CA3AF;
+            user-select: none;
+            transition: transform 0.15s ease;
+        }
+
+        .tree-arrow svg {
+            width: 8px;
+            height: 8px;
+            fill: currentColor;
+        }
+
+        .tree-arrow.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .tree-arrow.hidden-arrow {
+            visibility: hidden;
+        }
+
+        .tree-key {
+            color: #4B5563;
+            margin-right: 4px;
+        }
+
+        .tree-val-string {
+            color: #059669;
+            word-break: break-all;
+        }
+
+        .tree-val-number {
+            color: #2563EB;
+        }
+
+        .tree-val-bool {
+            color: #D97706;
+        }
+
+        .tree-val-null {
+            color: #9CA3AF;
+        }
+
+        .tree-children {
+            padding-left: 10px;
+            border-left: 1px solid #E5E7EB;
+            margin-left: 6px;
+            overflow: hidden;
+        }
+
+        .preview-text {
+            color: #9CA3AF;
+            font-size: 11px;
+            margin-left: 6px;
+            font-style: italic;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #E5E7EB;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D1D5DB;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #111827;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen overflow-hidden flex flex-col">
+
+    <header class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-4 h-4 bg-gray-900 rounded-sm"></div>
+            <span class="font-semibold text-sm tracking-tight-custom text-gray-900">Recovery Canvas</span>
+
+            <div id="connection-status" class="hidden flex items-center gap-2">
+                <span
+                    class="px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 border border-green-200 uppercase tracking-wide">Connected</span>
+                <span id="db-badge"
+                    class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-gray-100 text-gray-600 border border-gray-200 tracking-wide"></span>
+            </div>
+        </div>
+        <div id="header-actions" class="hidden">
+            <button onclick="app.reset()" class="text-xs text-gray-500 hover:text-gray-900 transition-subtle">Disconnect
+                & Reset</button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-hidden relative flex justify-center">
+
+        <div id="view-config" class="w-full max-w-lg mt-12 p-6 flex flex-col gap-6 animate-fade-in">
+            <div class="space-y-2 text-center">
+                <h1 class="text-xl font-semibold tracking-tight-custom text-gray-900">Connect to Firestore</h1>
+                <p class="text-sm text-gray-500">Paste your Firebase config object below.</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">Config
+                        JSON</label>
+                    <textarea id="config-input" rows="8"
+                        class="w-full p-3 font-mono text-xs leading-relaxed resize-none"
+                        placeholder='export const firebaseConfig = { ... }'></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1.5 uppercase tracking-wide">Database Name
+                        (Optional)</label>
+                    <input type="text" id="db-id-input" class="w-full p-2 text-sm" placeholder="(default)">
+                    <p class="text-[10px] text-gray-400 mt-1">Leave empty for default. Will be auto-filled if detected
+                        in JSON.</p>
+                </div>
+
+                <button onclick="app.parseAndContinue()"
+                    class="btn-primary w-full py-2.5 text-sm shadow-sm transition-subtle">
+                    Next: Authentication
+                </button>
+            </div>
+
+            <div id="config-error" class="hidden p-3 bg-red-50 border border-red-100 rounded-md text-xs text-red-600">
+            </div>
+        </div>
+
+        <div id="view-auth" class="hidden w-full max-w-sm mt-12 p-6 flex flex-col gap-6">
+            <div class="space-y-2 text-center">
+                <h1 class="text-xl font-semibold tracking-tight-custom text-gray-900">Authenticate</h1>
+                <p class="text-sm text-gray-500">Sign in via Google to access protected collections.</p>
+            </div>
+
+            <div class="space-y-3">
+                <button onclick="app.loginGoogle()"
+                    class="w-full bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2.5 px-4 rounded-md shadow-sm flex items-center justify-center gap-3 transition-subtle">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            fill="#4285F4" />
+                        <path
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                            fill="#34A853" />
+                        <path
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                            fill="#FBBC05" />
+                        <path
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                            fill="#EA4335" />
+                    </svg>
+                    <span class="text-sm">Sign in with Google</span>
+                </button>
+
+                <button onclick="app.setView('config')"
+                    class="text-xs text-gray-400 hover:text-gray-600 w-full text-center mt-2">Back to Config</button>
+            </div>
+            <div id="auth-error" class="hidden p-3 bg-red-50 border border-red-100 rounded-md text-xs text-red-600">
+            </div>
+        </div>
+
+        <div id="view-browser" class="hidden w-full h-full flex flex-col">
+
+            <div class="h-12 border-b border-gray-200 bg-white flex items-center px-4 gap-4 shrink-0">
+                <div class="flex-1 flex items-center gap-2">
+                    <span class="text-xs font-medium text-gray-500 uppercase">Path:</span>
+                    <form onsubmit="app.browsePath(event)" class="flex-1 flex">
+                        <input type="text" id="path-input" class="flex-1 text-sm border-none focus:ring-0 p-0"
+                            placeholder="e.g. users or users/ID" autocomplete="off">
+                    </form>
+                </div>
+                <button onclick="app.browsePath(null)"
+                    class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md font-medium transition-subtle">Go</button>
+            </div>
+
+            <div class="flex-1 flex overflow-hidden">
+
+                <div class="w-1/3 min-w-[300px] border-r border-gray-200 bg-white flex flex-col">
+                    <div class="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <span id="list-title"
+                            class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Documents</span>
+                        <span id="doc-count" class="text-[10px] text-gray-400">0 items</span>
+                    </div>
+                    <div id="list-container" class="flex-1 overflow-y-auto">
+                    </div>
+                </div>
+
+                <div class="flex-1 bg-white flex flex-col h-full overflow-hidden">
+                    <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-white shrink-0">
+                        <div class="flex flex-col">
+                            <span class="text-xs text-gray-400 uppercase tracking-wide mb-1">Selected Document</span>
+                            <span id="detail-id" class="text-sm font-medium text-gray-900 font-mono">No document
+                                selected</span>
+                        </div>
+                        <button id="btn-export" onclick="app.exportJson()" disabled
+                            class="btn-secondary px-3 py-1.5 text-xs opacity-50 cursor-not-allowed">
+                            Export JSON
+                        </button>
+                    </div>
+
+                    <div id="detail-container" class="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                        <div id="json-root" class="json-tree"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        // NOTE: Importing ...FromServer methods to fix the caching issue
+        import { getFirestore, collection, getDocsFromServer, doc, getDocFromServer, initializeFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        const state = {
+            config: null,
+            app: null,
+            db: null,
+            auth: null,
+            currentPath: "",
+            documents: [],
+            selectedDocId: null,
+            selectedDocData: null
+        };
+
+        const ui = {
+            get: (id) => document.getElementById(id),
+            show: (id) => document.getElementById(id).classList.remove('hidden'),
+            hide: (id) => document.getElementById(id).classList.add('hidden'),
+            setText: (id, txt) => document.getElementById(id).innerText = txt,
+            setHtml: (id, html) => document.getElementById(id).innerHTML = html,
+
+            renderList: (items) => {
+                const container = ui.get('list-container');
+                container.innerHTML = '';
+
+                if (items.length === 0) {
+                    container.innerHTML = `<div class="p-6 text-center text-sm text-gray-400">No data found.<br><span class="text-xs opacity-75">Check path or permissions.</span></div>`;
+                    return;
+                }
+
+                items.forEach(item => {
+                    const el = document.createElement('button');
+                    el.className = `w-full text-left px-4 py-3 border-b border-gray-100 text-sm hover:bg-gray-50 transition-subtle focus:bg-gray-100 outline-none flex items-center justify-between group`;
+
+                    const displayId = item.id.length > 24 ? item.id.substring(0, 24) + '...' : item.id;
+
+                    el.innerHTML = `
+                        <span class="font-medium text-gray-700 font-mono group-hover:text-gray-900">${displayId}</span>
+                        <span class="text-xs text-gray-300 group-hover:text-gray-400">→</span>
+                    `;
+                    el.onclick = () => app.loadDocument(item.id, item.data);
+                    container.appendChild(el);
+                });
+            },
+
+            // --- Recursive Tree Builder ---
+            renderJsonTree: (data) => {
+                const root = ui.get('json-root');
+                root.innerHTML = '';
+                if (!data) {
+                    root.innerHTML = '<span class="text-gray-400 italic">Select a document to view data...</span>';
+                    return;
+                }
+                root.appendChild(ui.buildTree(data, null));
+            },
+
+            buildTree: (val, key) => {
+                const isObj = val !== null && typeof val === 'object';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'tree-node';
+
+                const row = document.createElement('div');
+                row.className = 'tree-row';
+
+                const arrow = document.createElement('span');
+                arrow.className = 'tree-arrow';
+                if (isObj && Object.keys(val).length > 0) {
+                    arrow.innerHTML = `<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>`;
+                    row.onclick = (e) => {
+                        e.stopPropagation();
+                        arrow.classList.toggle('collapsed');
+                        const children = wrapper.querySelector('.tree-children');
+                        const preview = wrapper.querySelector('.preview-text');
+                        if (children) children.classList.toggle('hidden');
+                        if (preview) preview.classList.toggle('hidden');
+                    };
+                } else {
+                    arrow.classList.add('hidden-arrow');
+                }
+                row.appendChild(arrow);
+
+                if (key !== null) {
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'tree-key';
+                    keySpan.textContent = `${key}:`;
+                    row.appendChild(keySpan);
+                }
+
+                if (!isObj) {
+                    const valSpan = document.createElement('span');
+                    if (typeof val === 'string') {
+                        valSpan.className = 'tree-val-string';
+                        valSpan.textContent = `"${val}"`;
+                    } else if (typeof val === 'number') {
+                        valSpan.className = 'tree-val-number';
+                        valSpan.textContent = val;
+                    } else if (typeof val === 'boolean') {
+                        valSpan.className = 'tree-val-bool';
+                        valSpan.textContent = val;
+                    } else {
+                        valSpan.className = 'tree-val-null';
+                        valSpan.textContent = 'null';
+                    }
+                    row.appendChild(valSpan);
+                } else {
+                    const isArray = Array.isArray(val);
+                    const openChar = isArray ? '[' : '{';
+                    const closeChar = isArray ? ']' : '}';
+                    const size = Object.keys(val).length;
+
+                    const bracketStart = document.createElement('span');
+                    bracketStart.className = 'text-gray-500';
+                    bracketStart.textContent = openChar;
+                    row.appendChild(bracketStart);
+
+                    if (size > 0) {
+                        const preview = document.createElement('span');
+                        preview.className = 'preview-text hidden';
+                        preview.textContent = isArray ? `Array(${size}) ${closeChar}` : `{...} ${closeChar}`;
+                        row.appendChild(preview);
+                    } else {
+                        const bracketEnd = document.createElement('span');
+                        bracketEnd.className = 'text-gray-500';
+                        bracketEnd.textContent = closeChar;
+                        row.appendChild(bracketEnd);
+                    }
+                }
+                wrapper.appendChild(row);
+
+                if (isObj && Object.keys(val).length > 0) {
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'tree-children';
+
+                    // Sorting keys alphabetically to match Firebase Console
+                    const keys = Object.keys(val).sort();
+
+                    keys.forEach(k => {
+                        childrenContainer.appendChild(ui.buildTree(val[k], k));
+                    });
+
+                    const closeRow = document.createElement('div');
+                    closeRow.className = 'tree-row';
+                    const spacer = document.createElement('span');
+                    spacer.className = 'tree-arrow hidden-arrow';
+                    closeRow.appendChild(spacer);
+                    const bracketEnd = document.createElement('span');
+                    bracketEnd.className = 'text-gray-500';
+                    bracketEnd.textContent = Array.isArray(val) ? ']' : '}';
+                    closeRow.appendChild(bracketEnd);
+                    childrenContainer.appendChild(closeRow);
+                    wrapper.appendChild(childrenContainer);
+                }
+                return wrapper;
+            }
+        };
+
+        window.app = {
+            parseAndContinue: () => {
+                const rawInput = ui.get('config-input').value;
+                const dbOverride = ui.get('db-id-input').value.trim();
+
+                try {
+                    let cleanStr = rawInput.replace(/export\s+const\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
+                    const configObj = new Function(`return ${cleanStr}`)();
+                    if (!configObj.projectId) throw new Error("Invalid Config: Missing projectId");
+
+                    state.config = configObj;
+
+                    if (dbOverride) {
+                        state.config.databaseId = dbOverride;
+                    }
+                    if (state.config.databaseId && !dbOverride) {
+                        ui.get('db-id-input').value = state.config.databaseId;
+                    }
+
+                    ui.hide('config-error');
+                    app.setView('auth');
+
+                } catch (e) {
+                    ui.setText('config-error', "Could not parse config. Please paste the full object. Error: " + e.message);
+                    ui.show('config-error');
+                }
+            },
+
+            loginGoogle: async () => {
+                ui.hide('auth-error');
+                try {
+                    if (!state.app) {
+                        state.app = initializeApp(state.config);
+
+                        const targetDbId = state.config.databaseId || '(default)';
+
+                        // Strict Init: Always use getFirestore with 2nd arg if ID is present
+                        if (targetDbId && targetDbId !== '(default)') {
+                            state.db = getFirestore(state.app, targetDbId);
+                        } else {
+                            state.db = getFirestore(state.app);
+                        }
+
+                        ui.setText('db-badge', `DB: ${targetDbId}`);
+                        state.auth = getAuth(state.app);
+                    }
+
+                    const provider = new GoogleAuthProvider();
+                    await signInWithPopup(state.auth, provider);
+
+                    ui.show('connection-status');
+                    ui.show('header-actions');
+                    app.setView('browser');
+
+                } catch (e) {
+                    ui.setText('auth-error', e.message);
+                    ui.show('auth-error');
+                    console.error(e);
+                }
+            },
+
+            browsePath: async (e) => {
+                if (e) e.preventDefault();
+                let pathStr = ui.get('path-input').value.trim().replace(/\/$/, "");
+                if (!pathStr) return;
+
+                state.currentPath = pathStr;
+                const pathSegments = pathStr.split('/');
+
+                ui.setText('list-title', 'Loading...');
+                ui.setText('doc-count', '');
+                ui.get('list-container').innerHTML = '<div class="p-6 flex justify-center"><div class="spinner"></div></div>';
+
+                ui.setText('detail-id', 'No document selected');
+                ui.renderJsonTree(null);
+                ui.get('btn-export').disabled = true;
+                ui.get('btn-export').classList.add('opacity-50', 'cursor-not-allowed');
+
+                try {
+                    state.documents = [];
+
+                    if (pathSegments.length % 2 === 0) {
+                        ui.setText('list-title', 'Single Document');
+                        const docRef = doc(state.db, pathStr);
+                        // FORCE SERVER FETCH (Bypasses stale cache)
+                        const docSnap = await getDocFromServer(docRef);
+
+                        if (docSnap.exists()) {
+                            state.documents.push({ id: docSnap.id, data: docSnap.data() });
+                            ui.renderList(state.documents);
+                            app.loadDocument(docSnap.id, docSnap.data());
+                        } else {
+                            ui.get('list-container').innerHTML = `<div class="p-6 text-center text-sm text-gray-400">Document does not exist.</div>`;
+                        }
+                        ui.setText('doc-count', `1 item`);
+
+                    } else {
+                        ui.setText('list-title', pathSegments.pop().toUpperCase());
+                        const colRef = collection(state.db, pathStr);
+                        // FORCE SERVER FETCH (Bypasses stale cache)
+                        const snapshot = await getDocsFromServer(colRef);
+
+                        snapshot.forEach(doc => {
+                            state.documents.push({ id: doc.id, data: doc.data() });
+                        });
+
+                        ui.setText('doc-count', `${state.documents.length} items`);
+                        ui.renderList(state.documents);
+                    }
+
+                } catch (e) {
+                    ui.get('list-container').innerHTML = `<div class="p-4 text-red-600 text-xs">Error: ${e.message}</div>`;
+                    ui.setText('doc-count', 'Error');
+                }
+            },
+
+            loadDocument: (id, data) => {
+                state.selectedDocId = id;
+                state.selectedDocData = data;
+                ui.setText('detail-id', id);
+                ui.renderJsonTree(data);
+                const btn = ui.get('btn-export');
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            },
+
+            exportJson: () => {
+                if (!state.selectedDocData) return;
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.selectedDocData, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `${state.selectedDocId}.json`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            },
+
+            setView: (viewName) => {
+                ['config', 'auth', 'browser'].forEach(v => ui.hide(`view-${v}`));
+                ui.show(`view-${viewName}`);
+            },
+
+            reset: () => {
+                // Hard reset to clear Firebase instance from memory
+                location.reload();
+            }
+        };
+
+        ui.get('config-input').addEventListener('input', (e) => {
+            const val = e.target.value;
+            const match = val.match(/databaseId:\s*["']([^"']+)["']/);
+            if (match && match[1]) ui.get('db-id-input').value = match[1];
+        });
+
+    </script>
+</body>
+
+</html>
