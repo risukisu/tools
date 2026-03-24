@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check-in</title>
+    <style>
+        :root {
+            --bg-body: #FFFFFF;
+            --bg-subtle: #F9FAFB;
+            --bg-element: #FFFFFF;
+            --text-main: #111827;
+            --text-secondary: #6B7280;
+            --border-color: #E5E7EB;
+            --focus-ring: #111827;
+            --accent-color: #2563EB;
+            --radius: 6px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: var(--font-family);
+            background: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        h1, h2, h3 { letter-spacing: -0.025em; margin: 0; font-weight: 600; }
+        p { color: var(--text-secondary); line-height: 1.5; margin: 0; }
+
+        button {
+            background: var(--bg-element);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        button:hover { background: var(--bg-subtle); border-color: #D1D5DB; }
+        button:active { background: #F3F4F6; }
+        button.primary { background: var(--text-main); color: white; border: 1px solid var(--text-main); }
+        button.primary:hover { opacity: 0.85; }
+        button.danger { color: #EF4444; border-color: #FECACA; }
+
+        input, textarea, select {
+            width: 100%;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.15s;
+            background: var(--bg-element);
+        }
+        input:focus, textarea:focus, select:focus { border-color: var(--focus-ring); }
+        select { cursor: pointer; }
+
+        /* --- LAYOUT --- */
+        header {
+            height: 60px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: var(--bg-body);
+            z-index: 10;
+        }
+
+        main {
+            flex: 1;
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--bg-subtle);
+        }
+
+        .view {
+            display: none;
+            height: 100%;
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .view.active { display: flex; flex-direction: column; }
+
+        /* --- INPUT VIEW --- */
+        #view-input textarea {
+            flex: 1;
+            resize: none;
+            font-size: 16px;
+            line-height: 1.6;
+            box-shadow: var(--shadow-sm);
+        }
+        .input-controls {
+            margin-top: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* --- REVIEW VIEW --- */
+        #view-review { align-items: center; justify-content: center; position: relative; }
+
+        .progress-bar-container {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: #E5E7EB;
+        }
+        .progress-bar { height: 100%; background: var(--text-main); transition: width 0.3s ease; }
+
+        .review-card {
+            background: white;
+            width: 100%;
+            max-width: 600px;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .review-card h2 { font-size: 22px; font-weight: 500; margin-bottom: 8px; }
+        .review-card .meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 24px;
+        }
+
+        .scale-row {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .scale-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+        .scale-buttons { display: flex; gap: 8px; }
+        .scale-btn {
+            width: 44px; height: 44px;
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-weight: 600;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scale-btn.filled {
+            background: var(--text-main);
+            color: white;
+            border-color: var(--text-main);
+        }
+
+        .note-toggle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px 0;
+            margin-top: 4px;
+            transition: color 0.15s;
+        }
+        .note-toggle:hover { color: var(--text-main); }
+        .note-field { width: 100%; margin-top: 8px; }
+        .note-field textarea { height: 60px; resize: none; font-size: 13px; }
+
+        .review-layout {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            width: 100%;
+            max-width: 720px;
+        }
+        .nav-side-btn {
+            flex-shrink: 0;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.4;
+            transition: opacity 0.15s;
+        }
+        .nav-side-btn:hover { opacity: 1; }
+        .nav-side-btn:disabled { opacity: 0.1; cursor: default; background: transparent; }
+
+        .review-top-bar {
+            width: 100%;
+            max-width: 720px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .back-link {
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: none;
+            background: none;
+            padding: 4px 0;
+            transition: color 0.15s;
+        }
+        .back-link:hover { color: var(--text-main); background: none; }
+
+        .delete-btn {
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            padding: 6px;
+            cursor: pointer;
+            opacity: 0.4;
+            transition: opacity 0.15s, color 0.15s;
+            position: absolute;
+            top: 16px;
+            right: 16px;
+        }
+        .delete-btn:hover { opacity: 1; color: #EF4444; background: none; }
+
+        /* --- CHART VIEW --- */
+        #view-chart.active { display: flex; flex-direction: column; overflow-y: auto; }
+
+        .chart-wrapper {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            flex-shrink: 0;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-area {
+            position: absolute;
+            top: 28px; left: 44px; right: 16px; bottom: 36px;
+        }
+
+        .chart-grid-line {
+            position: absolute;
+            background: var(--border-color);
+        }
+        .chart-grid-h { width: 100%; height: 1px; left: 0; }
+        .chart-grid-v { height: 100%; width: 1px; top: 0; }
+        .chart-grid-mid { opacity: 1; }
+        .chart-grid-minor { opacity: 0.5; }
+
+        .quadrant-label {
+            position: absolute;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            pointer-events: none;
+            z-index: 3;
+        }
+        .ql-plan { color: #DC2626; top: 10px; left: 12px; }
+        .ql-keep { color: #16A34A; top: 10px; right: 12px; text-align: right; }
+        .ql-drop { color: var(--text-secondary); bottom: 10px; left: 12px; opacity: 0.6; }
+        .ql-auto { color: #CA8A04; bottom: 10px; right: 12px; text-align: right; }
+
+        .chart-dot {
+            position: absolute;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            border: 2px solid white;
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: transform 0.15s, box-shadow 0.15s;
+            z-index: 5;
+        }
+        .chart-dot:hover {
+            transform: translate(-50%, -50%) scale(1.5);
+            box-shadow: var(--shadow-md);
+            z-index: 6;
+        }
+
+        .chart-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            background: var(--text-main);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            display: none;
+        }
+        .chart-dot:hover .chart-tooltip { display: block; }
+
+        .quadrant-zone {
+            position: absolute;
+            width: 50%; height: 50%;
+            cursor: pointer;
+            z-index: 1;
+            transition: background 0.15s;
+        }
+        .quadrant-zone:hover { background: rgba(0, 0, 0, 0.02); }
+
+        .axis-label {
+            position: absolute;
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .axis-label-x { bottom: 10px; left: 44px; right: 16px; text-align: center; }
+        .axis-label-y {
+            top: 28px; bottom: 36px; left: 6px;
+            writing-mode: vertical-lr;
+            transform: rotate(180deg);
+            text-align: center;
+        }
+
+        .axis-tick {
+            position: absolute;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .chart-empty {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-secondary);
+            z-index: 4;
+        }
+
+        /* --- QUADRANT DETAIL --- */
+        .quadrant-detail {
+            margin-top: 24px;
+            max-width: 640px;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .quadrant-detail h3 { margin-bottom: 12px; }
+        .qd-list { display: flex; flex-direction: column; gap: 8px; }
+        .qd-item {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .qd-item .scores { font-size: 12px; color: var(--text-secondary); white-space: nowrap; margin-left: 12px; }
+        .qd-item-note { font-size: 12px; color: var(--text-secondary); }
+
+        .chart-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            max-width: 640px;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            padding-bottom: 24px;
+        }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+        .modal {
+            background: white;
+            width: 100%; max-width: 500px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            padding: 24px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .theme-select { width: auto; min-width: 140px; padding: 6px 10px; font-size: 13px; }
+        .theme-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+        }
+        .theme-row span:first-child { flex: 1; font-weight: 500; }
+        .theme-row .count { font-size: 12px; color: var(--text-secondary); }
+        .theme-row button { padding: 4px 8px; }
+
+        .danger-zone { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <h3>Check-in</h3>
+            <select id="theme-select" class="theme-select" onchange="app.switchTheme(this.value)"></select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button id="btn-chart" onclick="router.navigate('chart')">Wykres</button>
+            <button id="btn-input" onclick="router.navigate('input')">Edytuj</button>
+            <button onclick="settingsModal.open()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- INPUT VIEW -->
+        <div id="view-input" class="view">
+            <h2>Wklej swoją listę</h2>
+            <p style="margin-bottom: 16px;">Jedna rzecz na linię. Bulletpointy i numeracja zostaną usunięte automatycznie.</p>
+            <textarea id="raw-input" placeholder="1. Medytacja&#10;2. Ćwiczenia&#10;- Czytanie książek&#10;• Nauka angielskiego"></textarea>
+            <div class="input-controls">
+                <button class="danger" onclick="app.clearList()">Wyczyść</button>
+                <button class="primary" onclick="app.processInput()">Rozpocznij ocenę &rarr;</button>
+            </div>
+        </div>
+
+        <!-- REVIEW VIEW -->
+        <div id="view-review" class="view">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+            </div>
+
+            <div class="review-top-bar">
+                <button class="back-link" onclick="router.navigate('chart')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+                    Wykres
+                </button>
+            </div>
+
+            <div class="review-layout">
+                <button class="nav-side-btn" id="btn-prev" onclick="app.prevItem()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+
+                <div class="review-card" style="flex: 1; margin-bottom: 0; position: relative;">
+                    <button class="delete-btn" onclick="app.deleteItem()" title="Usuń">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                    <div class="meta">Element <span id="review-index">1</span> z <span id="review-total">1</span></div>
+                    <h2 id="review-text">...</h2>
+
+                    <div class="scale-row">
+                        <span class="scale-label">Postęp — jak mi idzie?</span>
+                        <div class="scale-buttons" id="scale-progress"></div>
+                    </div>
+                    <div class="scale-row">
+                        <span class="scale-label">Ważność — jak bardzo mi zależy?</span>
+                        <div class="scale-buttons" id="scale-importance"></div>
+                    </div>
+
+                    <div class="note-toggle" id="note-toggle" onclick="app.toggleNote()">+ Dodaj notatkę</div>
+                    <div class="note-field hidden" id="note-field">
+                        <textarea id="review-note" placeholder="Notatka..." onchange="app.saveNote(this.value)"></textarea>
+                    </div>
+                </div>
+
+                <button class="nav-side-btn" id="btn-next" onclick="app.nextItem()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- CHART VIEW -->
+        <div id="view-chart" class="view">
+            <div class="chart-wrapper">
+                <div class="chart-container" id="chart-container">
+                    <div class="axis-label axis-label-x">Postęp &rarr;</div>
+                    <div class="axis-label axis-label-y">Ważność &rarr;</div>
+                    <div class="chart-area" id="chart-area">
+                        <!-- Grid lines rendered by JS -->
+                        <!-- Quadrant labels -->
+                        <div class="quadrant-label ql-plan">Zrób plan</div>
+                        <div class="quadrant-label ql-keep">Tak trzymaj!</div>
+                        <div class="quadrant-label ql-drop">Porzuć</div>
+                        <div class="quadrant-label ql-auto">Autopilot</div>
+                        <!-- Quadrant click zones -->
+                        <div class="quadrant-zone" style="top:0; left:0;" onclick="app.showQuadrant('plan')"></div>
+                        <div class="quadrant-zone" style="top:0; left:50%;" onclick="app.showQuadrant('keep')"></div>
+                        <div class="quadrant-zone" style="top:50%; left:0;" onclick="app.showQuadrant('drop')"></div>
+                        <div class="quadrant-zone" style="top:50%; left:50%;" onclick="app.showQuadrant('auto')"></div>
+                        <!-- Empty state -->
+                        <div class="chart-empty hidden" id="chart-empty">
+                            <p>Brak ocenionych elementów.</p>
+                            <p style="font-size: 12px; margin-top: 4px;">Wróć do oceny, aby ocenić elementy.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="quadrant-detail" class="quadrant-detail hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="quadrant-title">...</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="app.copyQuadrant()">Kopiuj</button>
+                        <button onclick="document.getElementById('quadrant-detail').classList.add('hidden')">Zamknij</button>
+                    </div>
+                </div>
+                <div class="qd-list" id="quadrant-list"></div>
+            </div>
+
+            <div class="chart-actions">
+                <button onclick="router.navigate('review')">Wróć do oceny</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ITEM POPUP -->
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="popup-title" style="font-size: 18px;">...</h2>
+                <button onclick="itemPopup.close()">Zamknij</button>
+            </div>
+            <div class="scale-row">
+                <span class="scale-label">Postęp</span>
+                <div class="scale-buttons" id="popup-progress"></div>
+            </div>
+            <div class="scale-row">
+                <span class="scale-label">Ważność</span>
+                <div class="scale-buttons" id="popup-importance"></div>
+            </div>
+            <div class="note-field">
+                <span class="scale-label">Notatka</span>
+                <textarea id="popup-note" style="margin-top: 8px;" onchange="itemPopup.saveNote(this.value)"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Ustawienia</h2>
+                <button onclick="settingsModal.close()">Zamknij</button>
+            </div>
+
+            <h3>Tematy</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">Każdy temat ma osobną listę i oceny.</p>
+            <div id="themes-list"></div>
+            <button onclick="app.addTheme()" style="width: 100%; margin-top: 8px;">+ Nowy temat</button>
+
+            <div class="danger-zone">
+                <h3>Dane</h3>
+                <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+                    <button onclick="app.exportJSON()">Eksport JSON</button>
+                    <button onclick="document.getElementById('import-file').click()">Import JSON</button>
+                    <input type="file" id="import-file" accept=".json" style="display: none;" onchange="app.importJSON(event)">
+                </div>
+                <div style="margin-top: 12px;">
+                    <button class="danger" onclick="app.resetAll()" style="width: 100%;">Resetuj wszystko</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const DB_KEY = 'checkin_v1';
+        const QUADRANTS = {
+            plan: { name: 'Zrób plan', test: (p, i) => p <= 3 && i > 3 },
+            keep: { name: 'Tak trzymaj!', test: (p, i) => p > 3 && i > 3 },
+            drop: { name: 'Porzuć', test: (p, i) => p <= 3 && i <= 3 },
+            auto: { name: 'Autopilot', test: (p, i) => p > 3 && i <= 3 }
+        };
+
+        // --- STATE ---
+        const state = {
+            activeTheme: 'default',
+            themes: {
+                default: { name: 'Ogólny', items: [], focusIndex: 0 }
+            },
+            view: 'input'
+        };
+
+        function curr() { return state.themes[state.activeTheme]; }
+
+        // --- PERSISTENCE ---
+        function save() { localStorage.setItem(DB_KEY, JSON.stringify(state)); }
+
+        function load() {
+            const raw = localStorage.getItem(DB_KEY);
+            if (!raw) return;
+            try {
+                const d = JSON.parse(raw);
+                state.activeTheme = d.activeTheme || 'default';
+                state.themes = d.themes || { default: { name: 'Ogólny', items: [], focusIndex: 0 } };
+                if (!state.themes[state.activeTheme]) state.activeTheme = Object.keys(state.themes)[0];
+                state.view = curr().items.length > 0 ? 'chart' : 'input';
+            } catch (e) { /* corrupt data, use defaults */ }
+        }
+
+        // --- JITTER (stable per item) ---
+        const jitterCache = {};
+        function jitter(id) {
+            if (!jitterCache[id]) {
+                jitterCache[id] = {
+                    x: (Math.random() - 0.5) * 0.35,
+                    y: (Math.random() - 0.5) * 0.35
+                };
+            }
+            return jitterCache[id];
+        }
+
+        // --- APP ---
+        const app = {
+            init() {
+                load();
+                render.themeSelect();
+                router.navigate(state.view);
+            },
+
+            processInput() {
+                const raw = document.getElementById('raw-input').value;
+                if (!raw.trim()) return;
+                const cleanRe = /^\s*(\d+[\.\)]|-|—|•|\*|\[\s?\])?\s*/;
+                const items = raw.split('\n')
+                    .map(l => l.replace(cleanRe, '').trim())
+                    .filter(l => l.length > 0)
+                    .map(text => ({
+                        id: Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                        text,
+                        progress: null,
+                        importance: null,
+                        note: ''
+                    }));
+                if (items.length === 0) return;
+                curr().items = items;
+                curr().focusIndex = 0;
+                save();
+                router.navigate('review');
+            },
+
+            setScore(field, value) {
+                const item = curr().items[curr().focusIndex];
+                if (!item) return;
+                item[field] = value;
+                save();
+                render.review();
+            },
+
+            saveNote(value) {
+                const item = curr().items[curr().focusIndex];
+                if (item) { item.note = value; save(); }
+            },
+
+            toggleNote() {
+                const field = document.getElementById('note-field');
+                const toggle = document.getElementById('note-toggle');
+                field.classList.remove('hidden');
+                toggle.classList.add('hidden');
+                document.getElementById('review-note').focus();
+            },
+
+            deleteItem() {
+                const t = curr();
+                if (t.items.length === 0) return;
+                t.items.splice(t.focusIndex, 1);
+                if (t.focusIndex >= t.items.length) t.focusIndex = Math.max(0, t.items.length - 1);
+                save();
+                if (t.items.length === 0) { router.navigate('input'); return; }
+                render.review();
+            },
+
+            prevItem() {
+                const t = curr();
+                if (t.focusIndex > 0) { t.focusIndex--; save(); render.review(); }
+            },
+
+            nextItem() {
+                const t = curr();
+                if (t.focusIndex < t.items.length - 1) { t.focusIndex++; save(); render.review(); }
+            },
+
+            clearList() {
+                if (!confirm('Wyczyścić listę?')) return;
+                document.getElementById('raw-input').value = '';
+                curr().items = [];
+                curr().focusIndex = 0;
+                save();
+            },
+
+            // --- Themes ---
+            switchTheme(id) {
+                if (!state.themes[id]) return;
+                state.activeTheme = id;
+                save();
+                render.themeSelect();
+                router.navigate(curr().items.length > 0 ? 'chart' : 'input');
+            },
+
+            addTheme() {
+                const name = prompt('Nazwa tematu:');
+                if (!name || !name.trim()) return;
+                const id = 'theme_' + Date.now();
+                state.themes[id] = { name: name.trim(), items: [], focusIndex: 0 };
+                state.activeTheme = id;
+                save();
+                render.themeSelect();
+                render.themesList();
+                router.navigate('input');
+            },
+
+            deleteTheme(id) {
+                if (Object.keys(state.themes).length <= 1) {
+                    alert('Potrzebujesz co najmniej jednego tematu.');
+                    return;
+                }
+                if (!confirm('Usunąć temat "' + state.themes[id].name + '"?')) return;
+                delete state.themes[id];
+                if (state.activeTheme === id) state.activeTheme = Object.keys(state.themes)[0];
+                save();
+                render.themeSelect();
+                render.themesList();
+                router.navigate(curr().items.length > 0 ? 'chart' : 'input');
+            },
+
+            renameTheme(id) {
+                const name = prompt('Nowa nazwa:', state.themes[id].name);
+                if (!name || !name.trim()) return;
+                state.themes[id].name = name.trim();
+                save();
+                render.themeSelect();
+                render.themesList();
+            },
+
+            // --- Quadrant ---
+            _activeQuadrant: null,
+
+            showQuadrant(qid) {
+                this._activeQuadrant = qid;
+                const q = QUADRANTS[qid];
+                const items = curr().items.filter(i =>
+                    i.progress !== null && i.importance !== null && q.test(i.progress, i.importance)
+                );
+                document.getElementById('quadrant-title').textContent = q.name + ' (' + items.length + ')';
+                const list = document.getElementById('quadrant-list');
+                list.innerHTML = '';
+                if (items.length === 0) {
+                    list.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px; padding: 12px;">Brak elementów w tym kwadrancie.</p>';
+                } else {
+                    items.forEach(i => {
+                        const el = document.createElement('div');
+                        el.className = 'qd-item';
+                        let html = '<div><span>' + esc(i.text) + '</span>';
+                        if (i.note) html += '<div class="qd-item-note">' + esc(i.note) + '</div>';
+                        html += '</div>';
+                        html += '<span class="scores">P:' + i.progress + ' W:' + i.importance + '</span>';
+                        el.innerHTML = html;
+                        list.appendChild(el);
+                    });
+                }
+                document.getElementById('quadrant-detail').classList.remove('hidden');
+            },
+
+            copyQuadrant() {
+                if (!this._activeQuadrant) return;
+                const q = QUADRANTS[this._activeQuadrant];
+                const items = curr().items.filter(i =>
+                    i.progress !== null && i.importance !== null && q.test(i.progress, i.importance)
+                );
+                let md = '## ' + q.name + '\n';
+                if (items.length === 0) {
+                    md += '_Brak elementów._\n';
+                } else {
+                    items.forEach(i => {
+                        md += '- ' + i.text + ' (postęp: ' + i.progress + ', ważność: ' + i.importance + ')';
+                        if (i.note) md += ' — ' + i.note;
+                        md += '\n';
+                    });
+                }
+                navigator.clipboard.writeText(md).then(() => alert('Skopiowano do schowka!'));
+            },
+
+            // --- Export / Import ---
+            exportJSON() {
+                const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'checkin-backup.json';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            },
+
+            importJSON(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const d = JSON.parse(e.target.result);
+                        if (!d.themes) throw new Error('Invalid');
+                        state.activeTheme = d.activeTheme || Object.keys(d.themes)[0];
+                        state.themes = d.themes;
+                        if (!state.themes[state.activeTheme]) state.activeTheme = Object.keys(state.themes)[0];
+                        save();
+                        render.themeSelect();
+                        render.themesList();
+                        settingsModal.close();
+                        router.navigate(curr().items.length > 0 ? 'chart' : 'input');
+                        alert('Zaimportowano!');
+                    } catch (err) {
+                        alert('Błąd importu: nieprawidłowy format pliku.');
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            },
+
+            resetAll() {
+                if (!confirm('Na pewno? Wszystkie dane zostaną usunięte.')) return;
+                localStorage.removeItem(DB_KEY);
+                location.reload();
+            }
+        };
+
+        // --- ROUTER ---
+        const router = {
+            navigate(view) {
+                document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+                const target = document.getElementById('view-' + view);
+                if (!target) return;
+                target.classList.add('active');
+                state.view = view;
+                save();
+                if (view === 'review') render.review();
+                if (view === 'chart') render.chart();
+                if (view === 'input' && curr().items.length > 0) {
+                    document.getElementById('raw-input').value = curr().items.map(i => i.text).join('\n');
+                }
+            }
+        };
+
+        // --- RENDER ---
+        function esc(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        const render = {
+            review() {
+                const t = curr();
+                if (t.items.length === 0) return router.navigate('input');
+                const item = t.items[t.focusIndex];
+
+                document.getElementById('review-index').textContent = t.focusIndex + 1;
+                document.getElementById('review-total').textContent = t.items.length;
+                document.getElementById('review-text').textContent = item.text;
+                document.getElementById('review-note').value = item.note || '';
+                document.getElementById('progress-bar').style.width =
+                    ((t.focusIndex + 1) / t.items.length * 100) + '%';
+
+                // Note: show field if note exists, otherwise show toggle
+                const noteField = document.getElementById('note-field');
+                const noteToggle = document.getElementById('note-toggle');
+                if (item.note) {
+                    noteField.classList.remove('hidden');
+                    noteToggle.classList.add('hidden');
+                } else {
+                    noteField.classList.add('hidden');
+                    noteToggle.classList.remove('hidden');
+                }
+
+                // Nav buttons
+                document.getElementById('btn-prev').disabled = t.focusIndex === 0;
+                document.getElementById('btn-next').disabled = t.focusIndex >= t.items.length - 1;
+
+                render.scaleButtons('scale-progress', 'progress', item.progress);
+                render.scaleButtons('scale-importance', 'importance', item.importance);
+            },
+
+            scaleButtons(containerId, field, value) {
+                const c = document.getElementById(containerId);
+                c.innerHTML = '';
+                for (let n = 1; n <= 5; n++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'scale-btn' + (value !== null && n <= value ? ' filled' : '');
+                    btn.textContent = n;
+                    btn.onclick = () => app.setScore(field, n);
+                    c.appendChild(btn);
+                }
+            },
+
+            chart() {
+                const area = document.getElementById('chart-area');
+                // Remove old dots and grid ticks
+                area.querySelectorAll('.chart-dot, .chart-grid-line, .axis-tick').forEach(e => e.remove());
+
+                // Draw grid lines for values 1-5
+                for (let v = 1; v <= 5; v++) {
+                    const pct = ((v - 1) / 4) * 100;
+
+                    // Horizontal line (importance = v)
+                    const h = document.createElement('div');
+                    h.className = 'chart-grid-line chart-grid-h ' + (v === 3 ? 'chart-grid-mid' : 'chart-grid-minor');
+                    h.style.top = (100 - pct) + '%';
+                    if (v === 3) { h.style.height = '2px'; h.style.opacity = '0.4'; }
+                    area.appendChild(h);
+
+                    // Vertical line (progress = v)
+                    const vl = document.createElement('div');
+                    vl.className = 'chart-grid-line chart-grid-v ' + (v === 3 ? 'chart-grid-mid' : 'chart-grid-minor');
+                    vl.style.left = pct + '%';
+                    if (v === 3) { vl.style.width = '2px'; vl.style.opacity = '0.4'; }
+                    area.appendChild(vl);
+
+                    // X tick label
+                    const xt = document.createElement('div');
+                    xt.className = 'axis-tick';
+                    xt.textContent = v;
+                    xt.style.bottom = '-18px';
+                    xt.style.left = pct + '%';
+                    xt.style.transform = 'translateX(-50%)';
+                    area.appendChild(xt);
+
+                    // Y tick label
+                    const yt = document.createElement('div');
+                    yt.className = 'axis-tick';
+                    yt.textContent = v;
+                    yt.style.left = '-20px';
+                    yt.style.top = (100 - pct) + '%';
+                    yt.style.transform = 'translateY(-50%)';
+                    area.appendChild(yt);
+                }
+
+                // Dots
+                const rated = curr().items.filter(i => i.progress !== null && i.importance !== null);
+                const emptyEl = document.getElementById('chart-empty');
+
+                if (rated.length === 0) {
+                    emptyEl.classList.remove('hidden');
+                } else {
+                    emptyEl.classList.add('hidden');
+                }
+
+                rated.forEach(item => {
+                    const j = jitter(item.id);
+                    const xPct = ((item.progress + j.x - 1) / 4) * 100;
+                    const yPct = (1 - (item.importance + j.y - 1) / 4) * 100;
+
+                    const dot = document.createElement('div');
+                    dot.className = 'chart-dot';
+                    dot.style.left = Math.max(1, Math.min(99, xPct)) + '%';
+                    dot.style.top = Math.max(1, Math.min(99, yPct)) + '%';
+
+                    const tip = document.createElement('div');
+                    tip.className = 'chart-tooltip';
+                    tip.textContent = item.text;
+                    dot.appendChild(tip);
+
+                    dot.onclick = (e) => { e.stopPropagation(); itemPopup.open(item.id); };
+                    area.appendChild(dot);
+                });
+
+                document.getElementById('quadrant-detail').classList.add('hidden');
+            },
+
+            themeSelect() {
+                const sel = document.getElementById('theme-select');
+                sel.innerHTML = '';
+                Object.entries(state.themes).forEach(([id, t]) => {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = t.name;
+                    opt.selected = id === state.activeTheme;
+                    sel.appendChild(opt);
+                });
+            },
+
+            themesList() {
+                const list = document.getElementById('themes-list');
+                list.innerHTML = '';
+                Object.entries(state.themes).forEach(([id, t]) => {
+                    const row = document.createElement('div');
+                    row.className = 'theme-row';
+
+                    const name = document.createElement('span');
+                    name.textContent = t.name;
+                    const count = document.createElement('span');
+                    count.className = 'count';
+                    count.textContent = t.items.length + ' el.';
+                    const renameBtn = document.createElement('button');
+                    renameBtn.textContent = 'Zmień';
+                    renameBtn.onclick = () => app.renameTheme(id);
+                    const delBtn = document.createElement('button');
+                    delBtn.textContent = '×';
+                    delBtn.style.color = '#EF4444';
+                    delBtn.style.border = 'none';
+                    delBtn.onclick = () => app.deleteTheme(id);
+
+                    row.appendChild(name);
+                    row.appendChild(count);
+                    row.appendChild(renameBtn);
+                    row.appendChild(delBtn);
+                    list.appendChild(row);
+                });
+            }
+        };
+
+        // --- ITEM POPUP ---
+        const itemPopup = {
+            _id: null,
+
+            open(itemId) {
+                this._id = itemId;
+                const item = curr().items.find(i => i.id === itemId);
+                if (!item) return;
+                document.getElementById('popup-title').textContent = item.text;
+                document.getElementById('popup-note').value = item.note || '';
+                this._renderScale('popup-progress', 'progress', item.progress);
+                this._renderScale('popup-importance', 'importance', item.importance);
+                document.getElementById('item-modal').classList.add('open');
+            },
+
+            close() {
+                document.getElementById('item-modal').classList.remove('open');
+                this._id = null;
+                render.chart();
+            },
+
+            _renderScale(containerId, field, value) {
+                const c = document.getElementById(containerId);
+                c.innerHTML = '';
+                for (let n = 1; n <= 5; n++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'scale-btn' + (value !== null && n <= value ? ' filled' : '');
+                    btn.textContent = n;
+                    btn.onclick = () => {
+                        const item = curr().items.find(i => i.id === this._id);
+                        if (item) { item[field] = n; save(); this._renderScale(containerId, field, n); }
+                    };
+                    c.appendChild(btn);
+                }
+            },
+
+            saveNote(value) {
+                const item = curr().items.find(i => i.id === this._id);
+                if (item) { item.note = value; save(); }
+            }
+        };
+
+        // --- SETTINGS MODAL ---
+        const settingsModal = {
+            open() {
+                render.themesList();
+                document.getElementById('settings-modal').classList.add('open');
+            },
+            close() { document.getElementById('settings-modal').classList.remove('open'); }
+        };
+
+        // --- KEYBOARD ---
+        document.addEventListener('keydown', (e) => {
+            if (state.view !== 'review') return;
+            if (document.querySelector('.modal-overlay.open')) return;
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+            if (e.key === 'ArrowRight') app.nextItem();
+            if (e.key === 'ArrowLeft') app.prevItem();
+        });
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('open');
+                    if (overlay.id === 'item-modal') render.chart();
+                }
+            });
+        });
+
+        // --- BOOT ---
+        app.init();
+    </script>
+</body>
+</html>
