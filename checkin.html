@@ -206,6 +206,13 @@
         }
         .nav-side-btn:hover { opacity: 1; }
         .nav-side-btn:disabled { opacity: 0.1; cursor: default; background: transparent; }
+        .nav-side-btn.done-btn {
+            opacity: 1;
+            background: var(--text-main);
+            color: white;
+            border-color: var(--text-main);
+        }
+        .nav-side-btn.done-btn:hover { opacity: 0.85; background: var(--text-main); }
 
         .review-top-bar {
             width: 100%;
@@ -310,29 +317,45 @@
 
         .chart-tooltip {
             position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            margin-bottom: 8px;
+            left: calc(100% + 6px);
+            top: 0;
+            transform: none;
             background: var(--text-main);
             color: white;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            white-space: nowrap;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 7px;
+            width: max-content;
+            max-width: 120px;
+            white-space: normal;
+            line-height: 1.3;
+            text-align: left;
             pointer-events: none;
             display: none;
         }
         .chart-dot:hover .chart-tooltip { display: block; }
+        .chart-dot.tip-left .chart-tooltip {
+            left: auto;
+            right: calc(100% + 8px);
+        }
 
         .quadrant-zone {
             position: absolute;
             width: 50%; height: 50%;
-            cursor: pointer;
+            cursor: crosshair;
             z-index: 1;
             transition: background 0.15s;
         }
         .quadrant-zone:hover { background: rgba(0, 0, 0, 0.02); }
+
+        .selection-rect {
+            position: absolute;
+            border: 1.5px solid var(--accent-color);
+            background: rgba(37, 99, 235, 0.08);
+            pointer-events: none;
+            z-index: 4;
+            display: none;
+        }
 
         .axis-label {
             position: absolute;
@@ -538,11 +561,13 @@
                         <div class="quadrant-label ql-keep">Tak trzymaj!</div>
                         <div class="quadrant-label ql-drop">Porzuć</div>
                         <div class="quadrant-label ql-auto">Autopilot</div>
+                        <!-- Selection rectangle -->
+                        <div class="selection-rect" id="selection-rect"></div>
                         <!-- Quadrant click zones -->
-                        <div class="quadrant-zone" style="top:0; left:0;" onclick="app.showQuadrant('plan')"></div>
-                        <div class="quadrant-zone" style="top:0; left:50%;" onclick="app.showQuadrant('keep')"></div>
-                        <div class="quadrant-zone" style="top:50%; left:0;" onclick="app.showQuadrant('drop')"></div>
-                        <div class="quadrant-zone" style="top:50%; left:50%;" onclick="app.showQuadrant('auto')"></div>
+                        <div class="quadrant-zone" style="top:0; left:0;" data-q="plan"></div>
+                        <div class="quadrant-zone" style="top:0; left:50%;" data-q="keep"></div>
+                        <div class="quadrant-zone" style="top:50%; left:0;" data-q="drop"></div>
+                        <div class="quadrant-zone" style="top:50%; left:50%;" data-q="auto"></div>
                         <!-- Empty state -->
                         <div class="chart-empty hidden" id="chart-empty">
                             <p>Brak ocenionych elementów.</p>
@@ -574,7 +599,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h2 id="popup-title" style="font-size: 18px;">...</h2>
-                <button onclick="itemPopup.close()">Zamknij</button>
+                <button onclick="itemPopup.close()" style="padding: 4px 8px; border: none; font-size: 18px; color: var(--text-secondary);">&times;</button>
             </div>
             <div class="scale-row">
                 <span class="scale-label">Postęp</span>
@@ -665,6 +690,14 @@
             }
             return jitterCache[id];
         }
+
+        // --- CHART MAPPING ---
+        // Range 0.8..5.2 gives margin around 1..5 for easier edge selection
+        const CHART_MIN = 0.8;
+        const CHART_MAX = 5.2;
+        const CHART_RANGE = CHART_MAX - CHART_MIN;
+        function valToPos(v) { return ((v - CHART_MIN) / CHART_RANGE) * 100; }
+        function posToVal(pct) { return (pct / 100) * CHART_RANGE + CHART_MIN; }
 
         // --- APP ---
         const app = {
@@ -928,7 +961,22 @@
 
                 // Nav buttons
                 document.getElementById('btn-prev').disabled = t.focusIndex === 0;
-                document.getElementById('btn-next').disabled = t.focusIndex >= t.items.length - 1;
+                const btnNext = document.getElementById('btn-next');
+                const isLast = t.focusIndex >= t.items.length - 1;
+                const allRated = t.items.every(i => i.progress !== null && i.importance !== null);
+                if (isLast && allRated) {
+                    btnNext.disabled = false;
+                    btnNext.className = 'nav-side-btn done-btn';
+                    btnNext.onclick = () => router.navigate('chart');
+                    btnNext.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+                    btnNext.title = 'Gotowe — zobacz wykres';
+                } else {
+                    btnNext.disabled = isLast;
+                    btnNext.className = 'nav-side-btn';
+                    btnNext.onclick = () => app.nextItem();
+                    btnNext.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+                    btnNext.title = '';
+                }
 
                 render.scaleButtons('scale-progress', 'progress', item.progress);
                 render.scaleButtons('scale-importance', 'importance', item.importance);
@@ -953,7 +1001,7 @@
 
                 // Draw grid lines for values 1-5
                 for (let v = 1; v <= 5; v++) {
-                    const pct = ((v - 1) / 4) * 100;
+                    const pct = valToPos(v);
 
                     // Horizontal line (importance = v)
                     const h = document.createElement('div');
@@ -1000,13 +1048,13 @@
 
                 rated.forEach(item => {
                     const j = jitter(item.id);
-                    const xPct = ((item.progress + j.x - 1) / 4) * 100;
-                    const yPct = (1 - (item.importance + j.y - 1) / 4) * 100;
+                    const xPct = valToPos(Math.max(1, Math.min(5, item.progress + j.x)));
+                    const yPct = 100 - valToPos(Math.max(1, Math.min(5, item.importance + j.y)));
 
                     const dot = document.createElement('div');
-                    dot.className = 'chart-dot';
-                    dot.style.left = Math.max(1, Math.min(99, xPct)) + '%';
-                    dot.style.top = Math.max(1, Math.min(99, yPct)) + '%';
+                    dot.className = 'chart-dot' + (xPct > 60 ? ' tip-left' : '');
+                    dot.style.left = xPct + '%';
+                    dot.style.top = yPct + '%';
 
                     const tip = document.createElement('div');
                     tip.className = 'chart-tooltip';
@@ -1132,8 +1180,125 @@
             });
         });
 
+        // --- SELECTION TOOL ---
+        const sel = {
+            active: false,
+            startX: 0, startY: 0,
+            DRAG_THRESHOLD: 6,
+            wasDrag: false,
+
+            init() {
+                const area = document.getElementById('chart-area');
+                area.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('.chart-dot')) return;
+                    sel.active = true;
+                    sel.wasDrag = false;
+                    const rect = area.getBoundingClientRect();
+                    sel.startX = e.clientX - rect.left;
+                    sel.startY = e.clientY - rect.top;
+                    const box = document.getElementById('selection-rect');
+                    box.style.left = sel.startX + 'px';
+                    box.style.top = sel.startY + 'px';
+                    box.style.width = '0';
+                    box.style.height = '0';
+                    box.style.display = 'none';
+                    e.preventDefault();
+                });
+
+                area.addEventListener('mousemove', (e) => {
+                    if (!sel.active) return;
+                    const rect = area.getBoundingClientRect();
+                    const cx = e.clientX - rect.left;
+                    const cy = e.clientY - rect.top;
+                    const dx = cx - sel.startX;
+                    const dy = cy - sel.startY;
+                    if (!sel.wasDrag && (Math.abs(dx) > sel.DRAG_THRESHOLD || Math.abs(dy) > sel.DRAG_THRESHOLD)) {
+                        sel.wasDrag = true;
+                    }
+                    if (!sel.wasDrag) return;
+                    const box = document.getElementById('selection-rect');
+                    box.style.display = 'block';
+                    box.style.left = Math.min(sel.startX, cx) + 'px';
+                    box.style.top = Math.min(sel.startY, cy) + 'px';
+                    box.style.width = Math.abs(dx) + 'px';
+                    box.style.height = Math.abs(dy) + 'px';
+                });
+
+                document.addEventListener('mouseup', (e) => {
+                    if (!sel.active) return;
+                    sel.active = false;
+                    const box = document.getElementById('selection-rect');
+                    if (!sel.wasDrag) {
+                        box.style.display = 'none';
+                        // It was a click, not a drag — trigger quadrant click
+                        const zone = e.target.closest('.quadrant-zone');
+                        if (zone && zone.dataset.q) app.showQuadrant(zone.dataset.q);
+                        return;
+                    }
+                    // Calculate selection bounds as chart values
+                    const area = document.getElementById('chart-area');
+                    const w = area.offsetWidth;
+                    const h = area.offsetHeight;
+                    const rect = area.getBoundingClientRect();
+                    const cx = e.clientX - rect.left;
+                    const cy = e.clientY - rect.top;
+                    const x1 = Math.min(sel.startX, cx) / w;
+                    const x2 = Math.max(sel.startX, cx) / w;
+                    const y1 = Math.min(sel.startY, cy) / h;
+                    const y2 = Math.max(sel.startY, cy) / h;
+
+                    // Find items within selection
+                    const items = curr().items.filter(i => {
+                        if (i.progress === null || i.importance === null) return false;
+                        const j = jitter(i.id);
+                        const xPct = valToPos(Math.max(1, Math.min(5, i.progress + j.x))) / 100;
+                        const yPct = (100 - valToPos(Math.max(1, Math.min(5, i.importance + j.y)))) / 100;
+                        return xPct >= x1 && xPct <= x2 && yPct >= y1 && yPct <= y2;
+                    });
+
+                    if (items.length > 0) {
+                        app._activeQuadrant = '_selection';
+                        app._selectionItems = items;
+                        document.getElementById('quadrant-title').textContent = 'Zaznaczenie (' + items.length + ')';
+                        const list = document.getElementById('quadrant-list');
+                        list.innerHTML = '';
+                        items.forEach(i => {
+                            const el = document.createElement('div');
+                            el.className = 'qd-item';
+                            let html = '<div><span>' + esc(i.text) + '</span>';
+                            if (i.note) html += '<div class="qd-item-note">' + esc(i.note) + '</div>';
+                            html += '</div>';
+                            html += '<span class="scores">P:' + i.progress + ' W:' + i.importance + '</span>';
+                            el.innerHTML = html;
+                            list.appendChild(el);
+                        });
+                        document.getElementById('quadrant-detail').classList.remove('hidden');
+                    } else {
+                        box.style.display = 'none';
+                    }
+                });
+            }
+        };
+
+        // Override copyQuadrant to handle selection too
+        const _origCopyQuadrant = app.copyQuadrant.bind(app);
+        app.copyQuadrant = function() {
+            if (this._activeQuadrant === '_selection' && this._selectionItems) {
+                let md = '## Zaznaczenie\n';
+                this._selectionItems.forEach(i => {
+                    md += '- ' + i.text + ' (postęp: ' + i.progress + ', ważność: ' + i.importance + ')';
+                    if (i.note) md += ' — ' + i.note;
+                    md += '\n';
+                });
+                navigator.clipboard.writeText(md).then(() => alert('Skopiowano do schowka!'));
+                return;
+            }
+            _origCopyQuadrant();
+        };
+
         // --- BOOT ---
         app.init();
+        sel.init();
     </script>
 </body>
 </html>
