@@ -18,6 +18,7 @@ Inspired by [Simon Willison's "Useful patterns for building HTML tools"](https:/
 |------|-------------|
 | `triage.html` | Decision Canvas — a triage/prioritization board for sorting items |
 | `firestore.html` | Firestore Recovery Tool — backup and restore Firestore data |
+| `ga4-traffic-analyzer.html` | GA4 Traffic Analyzer — drop GA4 CSV exports, get YoY comparison, algorithm impact analysis, and SERP event overlays |
 
 ## Creating a new tool
 
