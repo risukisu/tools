@@ -1,6 +1,6 @@
 # Tools
 
-![CANDOR: copilot](https://img.shields.io/badge/䷼%20CANDOR-copilot-fee2e2?labelColor=fee2e2)
+[![CANDOR: copilot](https://img.shields.io/badge/䷼%20CANDOR-copilot-fee2e2?labelColor=fee2e2)](https://github.com/DimwitLabs/CANDOR.md)
 
 A collection of single-file HTML tools — each tool is one `.html` file with inline CSS and JavaScript. No build steps, no frameworks, no dependencies beyond CDN-loaded libraries.
 
@@ -113,4 +113,4 @@ Every new tool should start with these variables in `:root` and reference them t
 
 ---
 
-Built with [Claude Code](https://claude.ai/code) as copilot. [CANDOR: copilot](https://candor.md) — AI writes the code, I make the decisions.
+Built with [Claude Code](https://claude.ai/code) as copilot. [CANDOR: copilot](https://github.com/DimwitLabs/CANDOR.md) — AI writes the code, I make the decisions.
