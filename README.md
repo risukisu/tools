@@ -1,5 +1,7 @@
 # Tools
 
+![CANDOR: copilot](https://img.shields.io/badge/䷼%20CANDOR-copilot-fee2e2?labelColor=fee2e2)
+
 A collection of single-file HTML tools — each tool is one `.html` file with inline CSS and JavaScript. No build steps, no frameworks, no dependencies beyond CDN-loaded libraries.
 
 Inspired by [Simon Willison's "Useful patterns for building HTML tools"](https://simonwillison.net/2025/Mar/17/useful-patterns-for-building-html-tools/).
@@ -108,3 +110,7 @@ font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Hel
 ### CSS custom properties template
 
 Every new tool should start with these variables in `:root` and reference them throughout. Never hardcode color values in individual rules — always use the variables.
+
+---
+
+Built with [Claude Code](https://claude.ai/code) as copilot. [CANDOR: copilot](https://candor.md) — AI writes the code, I make the decisions.
